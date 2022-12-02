@@ -131,7 +131,12 @@ func GoroutineFuture[T any](f func() (T, error)) Future[T] {
 		if future.state != futurePending {
 			return // do nothing if already resolved
 		}
-		future.state = futureRejected
+		if err != nil {
+			future.state = futureRejected
+		} else {
+			future.state = futureResolved
+		}
+
 		future.err = err
 		future.value = res
 		for _, handle := range future.awaitHandles {
