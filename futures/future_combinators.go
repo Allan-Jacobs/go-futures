@@ -20,6 +20,18 @@ func Chain[T, O any](future Future[T], mapper func(T) (O, error)) Future[O] {
 	})
 }
 
+// Chain takes a Future[T] and returns a future that is mapped
+// with mapper, passing any errors that occurred to mapper
+func ChainErr[T, O any](future Future[T], mapper func(T, error) (O, error)) Future[O] {
+	return GoroutineFuture(func() (O, error) {
+		mapped, err := mapper(future.Await())
+		if err != nil {
+			return *new(O), err
+		}
+		return mapped, nil
+	})
+}
+
 // WhenComplete takes a Future[T] and returns a future that is settled
 // when the original future is, and executes callback on completion
 func WhenComplete[T any](future Future[T], callback func(T, error) error) VoidFuture {
