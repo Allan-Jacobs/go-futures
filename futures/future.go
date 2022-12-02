@@ -33,7 +33,7 @@ type Resolver[T any] func(T)
 type Rejector func(error)
 
 // a future that is similar to a javascript promise
-type promiseLikeFuture[T any] struct {
+type threadsafeFuture[T any] struct {
 	state        futureStatus
 	err          error
 	value        T
@@ -43,7 +43,7 @@ type promiseLikeFuture[T any] struct {
 	mutex sync.Mutex
 }
 
-func (c *promiseLikeFuture[T]) Await() (T, error) {
+func (c *threadsafeFuture[T]) Await() (T, error) {
 
 	// scope the defer to this function, so we can release the lock before reading the channel
 	ch, needToWait := func() (<-chan struct{}, bool) {
@@ -75,7 +75,7 @@ func (c *promiseLikeFuture[T]) Await() (T, error) {
 // This runs f in a different goroutine, so be aware of potential race conditions
 func PromiseLikeFuture[T any](f func(resolve Resolver[T], reject Rejector)) Future[T] {
 
-	future := &promiseLikeFuture[T]{
+	future := &threadsafeFuture[T]{
 		state:        futurePending,
 		awaitHandles: make([]struct{ signal chan<- struct{} }, 0),
 	}
@@ -115,7 +115,7 @@ func PromiseLikeFuture[T any](f func(resolve Resolver[T], reject Rejector)) Futu
 
 // This runs f in a goroutine and returns a future that settles the the result of f
 func GoroutineFuture[T any](f func() (T, error)) Future[T] {
-	future := &promiseLikeFuture[T]{
+	future := &threadsafeFuture[T]{
 		state:        futurePending,
 		awaitHandles: make([]struct{ signal chan<- struct{} }, 0),
 	}
