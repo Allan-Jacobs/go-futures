@@ -57,7 +57,7 @@ func WhenComplete[T any](future Future[T], callback func(T, error) error) VoidFu
 // futures resolve, or returns an error with any futures that reject
 func All[T any](futures ...Future[T]) Future[[]T] {
 	return GoroutineFuture(func() ([]T, error) {
-		results := make([]T, len(futures))
+		results := make([]T, 0)
 		for _, f := range futures {
 			res, err := f.Await()
 			if err != nil {
