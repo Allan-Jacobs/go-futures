@@ -108,7 +108,7 @@ func Any[T any](futures ...Future[T]) Future[T] {
 		}
 		wg.Wait()
 		if len(errs) != 0 {
-			reject(aggregate(errs))
+			reject(errorAggregation(errs))
 		}
 	})
 }

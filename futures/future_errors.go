@@ -27,7 +27,3 @@ func (e errorAggregation) Error() string {
 func (e errorAggregation) Errors() []error {
 	return e
 }
-
-func aggregate(errs []error) ErrorAggregation {
-	return errorAggregation(errs)
-}
