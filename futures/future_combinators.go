@@ -1,5 +1,9 @@
 package futures
 
+import (
+	"sync"
+)
+
 /////////////////////
 // Future Chaining //
 /////////////////////
@@ -77,6 +81,34 @@ func Race[T any](futures ...Future[T]) Future[T] {
 				}
 				return nil
 			})
+		}
+	})
+}
+
+// Any settles to the first future to resolve, or rejects with an error aggregation if none resolve
+func Any[T any](futures ...Future[T]) Future[T] {
+	return PromiseLikeFuture(func(resolve Resolver[T], reject Rejector) {
+		var wg sync.WaitGroup
+		var m sync.Mutex
+		errs := make([]error, 0)
+		for _, future := range futures {
+			wg.Add(1)
+			WhenComplete(future, func(t T, err error) error {
+				if err != nil {
+					m.Lock()
+					defer m.Unlock()
+					errs = append(errs, err)
+					wg.Done()
+				} else {
+					wg.Done()
+					resolve(t)
+				}
+				return nil
+			})
+		}
+		wg.Wait()
+		if len(errs) != 0 {
+			reject(aggregate(errs))
 		}
 	})
 }
