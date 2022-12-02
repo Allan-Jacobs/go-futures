@@ -64,3 +64,19 @@ func All[T any](futures ...Future[T]) Future[[]T] {
 		return results, nil
 	})
 }
+
+// Race settles to the first future to finish
+func Race[T any](futures ...Future[T]) Future[T] {
+	return PromiseLikeFuture(func(resolve Resolver[T], reject Rejector) {
+		for _, future := range futures {
+			WhenComplete(future, func(t T, err error) error {
+				if err != nil {
+					reject(err)
+				} else {
+					resolve(t)
+				}
+				return nil
+			})
+		}
+	})
+}
