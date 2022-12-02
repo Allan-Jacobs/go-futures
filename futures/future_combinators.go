@@ -20,6 +20,19 @@ func Chain[T, O any](future Future[T], mapper func(T) (O, error)) Future[O] {
 	})
 }
 
+// WhenComplete takes a Future[T] and returns a future that is settled
+// when the original future is, and executes callback on completion
+func WhenComplete[T any](future Future[T], callback func(T, error) error) VoidFuture {
+	return GoroutineFuture(func() (struct{}, error) {
+		res, err := future.Await()
+		err = callback(res, err)
+		if err != nil {
+			return struct{}{}, err
+		}
+		return struct{}{}, nil
+	})
+}
+
 ////////////////////////
 // Future Aggregation //
 ////////////////////////

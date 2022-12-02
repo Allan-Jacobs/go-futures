@@ -13,6 +13,10 @@ type Future[T any] interface {
 	Await() (T, error)
 }
 
+// A VoidFuture represents an asynchronous operation
+// that doesn't return a meaningful value
+type VoidFuture Future[struct{}]
+
 //////////////////////
 // Future Utilities //
 //////////////////////
