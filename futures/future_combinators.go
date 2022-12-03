@@ -2,6 +2,7 @@ package futures
 
 import (
 	"sync"
+	"time"
 )
 
 /////////////////////
@@ -47,6 +48,14 @@ func WhenComplete[T any](future Future[T], callback func(T, error) error) VoidFu
 		}
 		return struct{}{}, nil
 	})
+}
+
+// Returns a Future that times out with ErrTimeout if future does not settle before timeout
+func Timeout[T any](future Future[T], timeout time.Duration) Future[T] {
+	return Race(
+		future,
+		Chain[struct{}](WaitDurationFuture(timeout), func(s struct{}) (T, error) { return *new(T), nil }),
+	)
 }
 
 ////////////////////////
