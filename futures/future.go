@@ -9,7 +9,45 @@ import (
 // Interface definition //
 //////////////////////////
 
-// A Future represents an asynchronous operation
+// A Future[T] represents an asynchronous operation.
+// The Future[T] implementations in this module follow a "push" model.
+// This means that futures immediately start running their operations
+// as soon as they are created. [Future[T].Await] only blocks until the
+// future is complete and may be called multiple times across different
+// goroutines.
+//
+// Example:
+//
+// 		package main
+//
+// 		import (
+// 			"fmt"
+// 			"log"
+// 			"net/http"
+//
+// 			"github.com/Allan-Jacobs/go-futures/futures"
+// 		)
+//
+// 		func GetAsync(url string) futures.Future[*http.Response] {
+// 			return futures.GoroutineFuture(func() (*http.Response, error) {
+// 				return http.Get(url)
+// 			})
+// 		}
+//
+// 		func main() {
+//			// run GetAsync in parallel
+// 			results, err := futures.All(
+// 				GetAsync("https://go.dev"),
+// 				GetAsync("https://pkg.go.dev"),
+// 			).Await()
+// 			if err != nil {
+// 				log.Fatal("Error: ", err.Error())
+// 			}
+// 			for _, res := range results {
+// 				fmt.Printf("Got response from %s %s\n", res.Request.URL, res.Status)
+// 			}
+// 		}
+//
 type Future[T any] interface {
 	Await() (T, error)
 }
