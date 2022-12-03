@@ -13,8 +13,14 @@ import (
 // The Future[T] implementations in this module follow a "push" model.
 // This means that futures immediately start running their operations
 // as soon as they are created. [Future[T].Await] only blocks until the
-// future is complete and may be called multiple times across different
+// future is settled and may be called multiple times across different
 // goroutines.
+//
+// The future follows a basic state machine. The future starts as pending,
+// and after it "settles" or completes, it ends as either resolved or
+// rejected. Resolved futures return a nil error when awaited,
+// and indicate success. Rejected futures return a non-nil error when
+// awaited, which is a failure that should be handled.
 //
 // Example:
 //
@@ -28,6 +34,7 @@ import (
 // 			"github.com/Allan-Jacobs/go-futures/futures"
 // 		)
 //
+//		// GetAsync wraps [http.Get] in a future
 // 		func GetAsync(url string) futures.Future[*http.Response] {
 // 			return futures.GoroutineFuture(func() (*http.Response, error) {
 // 				return http.Get(url)
@@ -35,14 +42,16 @@ import (
 // 		}
 //
 // 		func main() {
-//			// run GetAsync in parallel
+//			// run GetAsync concurrently
 // 			results, err := futures.All(
 // 				GetAsync("https://go.dev"),
 // 				GetAsync("https://pkg.go.dev"),
 // 			).Await()
-// 			if err != nil {
+//
+// 			if err != nil { // evaluates to true when the future rejects
 // 				log.Fatal("Error: ", err.Error())
 // 			}
+//
 // 			for _, res := range results {
 // 				fmt.Printf("Got response from %s %s\n", res.Request.URL, res.Status)
 // 			}
@@ -115,7 +124,9 @@ func (c *threadsafeFuture[T]) Await() (T, error) {
 }
 
 // A future type similar to JavaScript's Promise
-// This runs f in a different goroutine, so be aware of potential race conditions
+// This runs f in a different goroutine, so be aware of potential race conditions.
+// if resolve or reject are called multiple times, they are no-ops. However multiple
+// calls are discouraged, as it acquires a mutex every call.
 func PromiseLikeFuture[T any](f func(resolve Resolver[T], reject Rejector)) Future[T] {
 
 	future := &threadsafeFuture[T]{
