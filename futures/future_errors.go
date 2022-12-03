@@ -1,6 +1,9 @@
 package futures
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 // An aggregate error type
 type ErrorAggregation interface {
@@ -27,3 +30,9 @@ func (e errorAggregation) Error() string {
 func (e errorAggregation) Errors() []error {
 	return e
 }
+
+// An error happens when ChannelFuture is called on a closed channel
+var ErrReadFromClosedChannel = errors.New("cannot <- from closed channel")
+
+// An error happens when ChannelFuture is called on a nil channel
+var ErrReadFromNilChannel = errors.New("cannot <- from nil channel")

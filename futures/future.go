@@ -2,6 +2,7 @@ package futures
 
 import (
 	"sync"
+	"time"
 )
 
 //////////////////////////
@@ -181,4 +182,22 @@ func Rejected[T any](err error) Future[T] {
 		err:   err,
 		value: *new(T),
 	}
+}
+
+/////////////////////
+// Channel Futures //
+/////////////////////
+
+// A future that resolves to the next value of the channel
+func ChannelFuture[T any](ch <-chan T) Future[T] {
+	if ch == nil {
+		return Rejected[T](ErrReadFromNilChannel)
+	}
+	return GoroutineFuture(func() (T, error) {
+		res, isOpen := <-ch
+		if !isOpen {
+			return *new(T), ErrReadFromClosedChannel
+		}
+		return res, nil
+	})
 }
