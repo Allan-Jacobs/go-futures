@@ -7,7 +7,7 @@ An easy to use generic future implementation in Go.
 ### Install
 
 ```sh
-get get github.com/Allan-Jacobs/go-futures@latest
+go get github.com/Allan-Jacobs/go-futures@latest
 ```
 
 ### Example
