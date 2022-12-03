@@ -1,6 +1,7 @@
 package futures
 
 import (
+	"errors"
 	"math/rand"
 	"sync"
 	"testing"
@@ -99,4 +100,81 @@ func TestAwaitMultipleDelayed(t *testing.T) {
 		}(time.Duration(rand.Intn(25) * int(time.Microsecond)))
 	}
 	wg.Wait()
+}
+
+func TestPromiseLikeFutureResolve(t *testing.T) {
+	future := PromiseLikeFuture(func(resolve Resolver[int], reject Rejector) {
+		resolve(2)
+	})
+	res, err := future.Await()
+	if err != nil {
+		t.Fatalf("err != nil, got %v", err)
+	}
+	if res != 2 {
+		t.Fatalf("result != 2, result = %d", res)
+	}
+}
+
+func TestPromiseLikeFutureReject(t *testing.T) {
+	expectedError := errors.New("Rejected!")
+	future := PromiseLikeFuture(func(resolve Resolver[int], reject Rejector) {
+		reject(expectedError)
+	})
+	res, err := future.Await()
+	if err == nil {
+		t.Fatalf("err == nil, got res: %d", res)
+	}
+	if !errors.Is(err, expectedError) {
+		t.Fatalf("err != expectedError, got: %v", err)
+	}
+}
+
+func TestGoroutineFutureResolve(t *testing.T) {
+	future := GoroutineFuture(func() (int, error) {
+		return 5, nil
+	})
+	res, err := future.Await()
+	if err != nil {
+		t.Fatalf("err != nil, got %v", err)
+	}
+	if res != 5 {
+		t.Fatalf("result != 5, got: %d", res)
+	}
+}
+
+func TestGoroutineFutureReject(t *testing.T) {
+	expectedError := errors.New("Rejected!")
+	future := GoroutineFuture(func() (int, error) {
+		return 0, expectedError
+	})
+	res, err := future.Await()
+	if err == nil {
+		t.Fatalf("err == nil, got res: %d", res)
+	}
+	if !errors.Is(err, expectedError) {
+		t.Fatalf("err != expectedError, got: %v", err)
+	}
+}
+
+func TestSettledFutureResolve(t *testing.T) {
+	future := Resolved(4)
+	res, err := future.Await()
+	if err != nil {
+		t.Fatalf("err != nil, got %v", err)
+	}
+	if res != 4 {
+		t.Fatalf("result != 4, got: %d", res)
+	}
+}
+
+func TestSettledFutureReject(t *testing.T) {
+	expectedError := errors.New("Rejected!")
+	future := Rejected[int](expectedError)
+	res, err := future.Await()
+	if err == nil {
+		t.Fatalf("err == nil, got res: %d", res)
+	}
+	if !errors.Is(err, expectedError) {
+		t.Fatalf("err != expectedError, got: %v", err)
+	}
 }

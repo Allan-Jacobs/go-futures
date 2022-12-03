@@ -227,7 +227,7 @@ func Resolved[T any](value T) Future[T] {
 // Returns a future that rejects with err
 func Rejected[T any](err error) Future[T] {
 	return &settledFuture[T]{
-		state: futureResolved,
+		state: futureRejected,
 		err:   err,
 		value: *new(T),
 	}
