@@ -201,3 +201,20 @@ func ChannelFuture[T any](ch <-chan T) Future[T] {
 		return res, nil
 	})
 }
+
+///////////////////////////
+// Wait Duration Futures //
+///////////////////////////
+
+// A future that resolves after the duration.
+// This future may take longer than duration,
+// but is guaranteed to take at least duration.
+func WaitDurationFuture(duration time.Duration) VoidFuture {
+	return GoroutineFuture(func() (struct{}, error) {
+		_, isOpen := <-time.After(duration)
+		if !isOpen {
+			return struct{}{}, ErrReadFromClosedChannel
+		}
+		return struct{}{}, nil
+	})
+}

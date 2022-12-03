@@ -36,3 +36,6 @@ var ErrReadFromClosedChannel = errors.New("cannot <- from closed channel")
 
 // An error happens when ChannelFuture is called on a nil channel
 var ErrReadFromNilChannel = errors.New("cannot <- from nil channel")
+
+// An error that happens when a future times out
+var ErrTimeout = errors.New("Future timed out")
