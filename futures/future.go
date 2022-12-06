@@ -60,7 +60,7 @@ type Future[T any] interface {
 	Await() (T, error)
 }
 
-// A future that can be canceled
+// A future that can be cancelled
 type CancellableFuture[T any] interface {
 	Future[T]
 	Cancel()

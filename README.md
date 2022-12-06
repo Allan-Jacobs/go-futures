@@ -46,4 +46,4 @@ func main() {
 
 ### License
 
-go-futures is [MIT Licensed](https://github.com/Allan-Jacobs/go-futures/blob/master/LICENCE)
+go-futures is [MIT Licensed](https://github.com/Allan-Jacobs/go-futures/blob/master/LICENSE)
