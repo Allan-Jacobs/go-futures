@@ -38,4 +38,7 @@ var ErrReadFromClosedChannel = errors.New("cannot <- from closed channel")
 var ErrReadFromNilChannel = errors.New("cannot <- from nil channel")
 
 // An error that happens when a future times out
-var ErrTimeout = errors.New("Future timed out")
+var ErrTimeout = errors.New("future timed out")
+
+// An error that happens when a future gets cancelled
+var ErrCancelled = errors.New("future cancelled")
