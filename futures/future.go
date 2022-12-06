@@ -320,12 +320,19 @@ func ChannelFuture[T any](ch <-chan T) Future[T] {
 // A future that resolves after the duration.
 // This future may take longer than duration,
 // but is guaranteed to take at least duration.
-func WaitDurationFuture(duration time.Duration) VoidFuture {
-	return GoroutineFuture(func() (struct{}, error) {
-		_, isOpen := <-time.After(duration)
+func SleepFuture(duration time.Duration) CancellableFuture[struct{}] {
+	return CancellableGoroutineFuture(func(signal <-chan struct{}) (struct{}, error) {
+		timer := time.NewTimer(duration)
+		select {
+		case _, isOpen := <-timer.C:
 			if !isOpen {
 				return struct{}{}, ErrReadFromClosedChannel
 			}
+			return struct{}{}, nil
+		case <-signal:
+			timer.Stop()
+		}
+
 		return struct{}{}, nil
 	})
 }
