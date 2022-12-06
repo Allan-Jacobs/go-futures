@@ -37,17 +37,12 @@ func ChainErr[T, O any](future Future[T], mapper func(T, error) (O, error)) Futu
 	})
 }
 
-// WhenComplete takes a Future[T] and returns a future that is settled
-// when the original future is, and executes callback on completion
-func WhenComplete[T any](future Future[T], callback func(T, error) error) Future[struct{}] {
-	return GoroutineFuture(func() (struct{}, error) {
+// OnSettled takes a Future[T] and exectutes the callback in another goroutine when it is settled
+func OnSettled[T any](future Future[T], callback func(T, error)) {
+	go func() {
 		res, err := future.Await()
-		err = callback(res, err)
-		if err != nil {
-			return struct{}{}, err
-		}
-		return struct{}{}, nil
-	})
+		callback(res, err)
+	}()
 }
 
 // Returns a Future that times out with ErrTimeout if future does not settle before timeout
@@ -88,13 +83,12 @@ func All[T any](futures ...Future[T]) Future[[]T] {
 func Race[T any](futures ...Future[T]) Future[T] {
 	return PromiseLikeFuture(func(resolve Resolver[T], reject Rejector) {
 		for _, future := range futures {
-			WhenComplete(future, func(t T, err error) error {
+			OnSettled(future, func(t T, err error) {
 				if err != nil {
 					reject(err)
 				} else {
 					resolve(t)
 				}
-				return nil
 			})
 		}
 	})
@@ -108,7 +102,7 @@ func Any[T any](futures ...Future[T]) Future[T] {
 		errs := make([]error, 0)
 		for _, future := range futures {
 			wg.Add(1)
-			WhenComplete(future, func(t T, err error) error {
+			OnSettled(future, func(t T, err error) {
 				if err != nil {
 					m.Lock()
 					defer m.Unlock()
@@ -118,12 +112,34 @@ func Any[T any](futures ...Future[T]) Future[T] {
 					wg.Done()
 					resolve(t)
 				}
-				return nil
 			})
 		}
 		wg.Wait()
 		if len(errs) != 0 {
 			reject(errorAggregation(errs))
 		}
+	})
+}
+
+func AllSettled[T any](futures []Future[T]) Future[[]struct {
+	val T
+	err error
+}] {
+	return GoroutineFuture(func() ([]struct {
+		val T
+		err error
+	}, error) {
+		res := make([]struct {
+			val T
+			err error
+		}, 0)
+		for _, future := range futures {
+			r, err := future.Await()
+			res = append(res, struct {
+				val T
+				err error
+			}{val: r, err: err})
+		}
+		return res, nil
 	})
 }
