@@ -79,6 +79,18 @@ func Timeout[T any](future Future[T], timeout time.Duration) Future[T] {
 	)
 }
 
+// Returns a future that resolves the same value as the inner future,
+// unless the outer future errors, in which case returned the future errors
+func Flatten[T any](future Future[Future[T]]) Future[T] {
+	return GoroutineFuture(func() (T, error) {
+		inner, err := future.Await()
+		if err != nil {
+			return *new(T), err
+		}
+		return inner.Await()
+	})
+}
+
 ////////////////////////
 // Future Aggregation //
 ////////////////////////
