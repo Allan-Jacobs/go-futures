@@ -24,46 +24,47 @@ import (
 //
 // Example:
 //
-// 		package main
+//	package main
 //
-// 		import (
-// 			"fmt"
-// 			"log"
-// 			"net/http"
+//	import (
+//		"fmt"
+//		"log"
+//		"net/http"
 //
-// 			"github.com/Allan-Jacobs/go-futures/futures"
-// 		)
+//		"github.com/Allan-Jacobs/go-futures/futures"
+//	)
 //
-//		// GetAsync wraps [http.Get] in a future
-// 		func GetAsync(url string) futures.Future[*http.Response] {
-// 			return futures.GoroutineFuture(func() (*http.Response, error) {
-// 				return http.Get(url)
-// 			})
-// 		}
+//	// GetAsync wraps [http.Get] in a future
+//	func GetAsync(url string) futures.Future[*http.Response] {
+//		return futures.GoroutineFuture(func() (*http.Response, error) {
+//			return http.Get(url)
+//		})
+//	}
 //
-// 		func main() {
-//			// run GetAsync concurrently
-// 			results, err := futures.All(
-// 				GetAsync("https://go.dev"),
-// 				GetAsync("https://pkg.go.dev"),
-// 			).Await()
+//	func main() {
+//		// run GetAsync concurrently
+//		results, err := futures.All(
+//			GetAsync("https://go.dev"),
+//			GetAsync("https://pkg.go.dev"),
+//		).Await()
 //
-// 			if err != nil { // evaluates to true when the future rejects
-// 				log.Fatal("Error: ", err.Error())
-// 			}
+//		if err != nil { // evaluates to true when the future rejects
+//			log.Fatal("Error: ", err.Error())
+//		}
 //
-// 			for _, res := range results {
-// 				fmt.Printf("Got response from %s %s\n", res.Request.URL, res.Status)
-// 			}
-// 		}
-//
+//		for _, res := range results {
+//			fmt.Printf("Got response from %s %s\n", res.Request.URL, res.Status)
+//		}
+//	}
 type Future[T any] interface {
 	Await() (T, error)
 }
 
-// A VoidFuture represents an asynchronous operation
-// that doesn't return a meaningful value
-type VoidFuture Future[struct{}]
+// A future that can be canceled
+type CancellableFuture[T any] interface {
+	Future[T]
+	Cancel()
+}
 
 //////////////////////
 // Future Utilities //
@@ -77,13 +78,6 @@ const (
 	futureRejected
 )
 
-//////////////////////////
-// Promise Like Futures //
-//////////////////////////
-
-type Resolver[T any] func(T)
-type Rejector func(error)
-
 // a future that is similar to a javascript promise
 type threadsafeFuture[T any] struct {
 	state        futureStatus
@@ -94,6 +88,39 @@ type threadsafeFuture[T any] struct {
 	}
 	mutex sync.Mutex
 }
+
+// a future that wraps threadsafeFuture into a cancellable future
+type cancellableThreadsafeFuture[T any] struct {
+	threadsafeFuture threadsafeFuture[T]
+	signal           chan struct{}
+}
+
+func (c *cancellableThreadsafeFuture[T]) Await() (T, error) {
+	return c.threadsafeFuture.Await()
+}
+
+func (c *cancellableThreadsafeFuture[T]) Cancel() {
+	c.threadsafeFuture.mutex.Lock()
+	defer c.threadsafeFuture.mutex.Unlock()
+	if c.threadsafeFuture.state != futurePending {
+		// already completed
+		return
+	} else {
+		c.threadsafeFuture.err = ErrCancelled
+		c.threadsafeFuture.state = futureRejected
+	}
+	for _, handle := range c.threadsafeFuture.awaitHandles {
+		handle.signal <- struct{}{} // notify active await
+	}
+	c.signal <- struct{}{} // notify operation that it is cancelled
+}
+
+//////////////////////////
+// Promise Like Futures //
+//////////////////////////
+
+type Resolver[T any] func(T)
+type Rejector func(error)
 
 func (c *threadsafeFuture[T]) Await() (T, error) {
 
@@ -196,6 +223,41 @@ func GoroutineFuture[T any](f func() (T, error)) Future[T] {
 	return future
 }
 
+// This runs f in a goroutine and returns a future that settles the the result of f.
+// The goroutine should cancel its operation when it recives a value on signal
+// This future can be cancelled.
+func CancellableGoroutineFuture[T any](f func(signal <-chan struct{}) (T, error)) CancellableFuture[T] {
+	signal := make(chan struct{})
+	future := &cancellableThreadsafeFuture[T]{
+		threadsafeFuture: threadsafeFuture[T]{
+			state:        futurePending,
+			awaitHandles: make([]struct{ signal chan<- struct{} }, 0),
+		},
+		signal: signal,
+	}
+
+	go func() {
+		res, err := f(signal)
+		future.threadsafeFuture.mutex.Lock()
+		defer future.threadsafeFuture.mutex.Unlock()
+		if future.threadsafeFuture.state != futurePending {
+			return // do nothing if already resolved
+		}
+		if err != nil {
+			future.threadsafeFuture.state = futureRejected
+		} else {
+			future.threadsafeFuture.state = futureResolved
+		}
+
+		future.threadsafeFuture.err = err
+		future.threadsafeFuture.value = res
+		for _, handle := range future.threadsafeFuture.awaitHandles {
+			handle.signal <- struct{}{} // notify active await
+		}
+	}()
+	return future
+}
+
 /////////////////////
 // Settled Futures //
 /////////////////////
@@ -261,9 +323,9 @@ func ChannelFuture[T any](ch <-chan T) Future[T] {
 func WaitDurationFuture(duration time.Duration) VoidFuture {
 	return GoroutineFuture(func() (struct{}, error) {
 		_, isOpen := <-time.After(duration)
-		if !isOpen {
-			return struct{}{}, ErrReadFromClosedChannel
-		}
+			if !isOpen {
+				return struct{}{}, ErrReadFromClosedChannel
+			}
 		return struct{}{}, nil
 	})
 }

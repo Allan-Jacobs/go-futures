@@ -39,7 +39,7 @@ func ChainErr[T, O any](future Future[T], mapper func(T, error) (O, error)) Futu
 
 // WhenComplete takes a Future[T] and returns a future that is settled
 // when the original future is, and executes callback on completion
-func WhenComplete[T any](future Future[T], callback func(T, error) error) VoidFuture {
+func WhenComplete[T any](future Future[T], callback func(T, error) error) Future[struct{}] {
 	return GoroutineFuture(func() (struct{}, error) {
 		res, err := future.Await()
 		err = callback(res, err)
@@ -54,7 +54,13 @@ func WhenComplete[T any](future Future[T], callback func(T, error) error) VoidFu
 func Timeout[T any](future Future[T], timeout time.Duration) Future[T] {
 	return Race(
 		future,
-		Chain[struct{}](WaitDurationFuture(timeout), func(s struct{}) (T, error) { return *new(T), nil }),
+		Chain[struct{}](SleepFuture(timeout), func(s struct{}) (T, error) {
+			switch c := future.(type) {
+			case CancellableFuture[T]:
+				c.Cancel() // cancel the future if its cancellable
+			}
+			return *new(T), ErrTimeout
+		}),
 	)
 }
 
