@@ -57,13 +57,17 @@ import (
 //		}
 //	}
 type Future[T any] interface {
+	// Await blocks the current goroutine until the future is settled.
+	// Await may be called by different goroutines concurrently, and it may be called multiple times.
 	Await() (T, error)
 }
 
 // A future that can be cancelled
 type CancellableFuture[T any] interface {
 	Future[T]
-	Cancel()
+	// Cancel attempts to cancel the future, and returns true if it is cancelled.
+	// Cancel will return false if the future has already completed.
+	Cancel() bool
 }
 
 //////////////////////
@@ -99,12 +103,12 @@ func (c *cancellableThreadsafeFuture[T]) Await() (T, error) {
 	return c.threadsafeFuture.Await()
 }
 
-func (c *cancellableThreadsafeFuture[T]) Cancel() {
+func (c *cancellableThreadsafeFuture[T]) Cancel() bool {
 	c.threadsafeFuture.mutex.Lock()
 	defer c.threadsafeFuture.mutex.Unlock()
 	if c.threadsafeFuture.state != futurePending {
 		// already completed
-		return
+		return false
 	} else {
 		c.threadsafeFuture.err = ErrCancelled
 		c.threadsafeFuture.state = futureRejected
