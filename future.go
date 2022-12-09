@@ -115,8 +115,11 @@ func (c *cancellableThreadsafeFuture[T]) Cancel() bool {
 	}
 	for _, handle := range c.threadsafeFuture.awaitHandles {
 		handle.signal <- struct{}{} // notify active await
+		close(handle.signal)
 	}
 	c.signal <- struct{}{} // notify operation that it is cancelled
+	close(c.signal)
+	return true
 }
 
 //////////////////////////
@@ -175,6 +178,7 @@ func PromiseLikeFuture[T any](f func(resolve Resolver[T], reject Rejector)) Futu
 		future.value = t
 		for _, handle := range future.awaitHandles {
 			handle.signal <- struct{}{} // notify active await
+			close(handle.signal)
 		}
 
 	}
@@ -188,6 +192,7 @@ func PromiseLikeFuture[T any](f func(resolve Resolver[T], reject Rejector)) Futu
 		future.err = e
 		for _, handle := range future.awaitHandles {
 			handle.signal <- struct{}{} // notify active await
+			close(handle.signal)
 		}
 	}
 	go f(resolve, reject)
@@ -222,6 +227,7 @@ func GoroutineFuture[T any](f func() (T, error)) Future[T] {
 		future.value = res
 		for _, handle := range future.awaitHandles {
 			handle.signal <- struct{}{} // notify active await
+			close(handle.signal)
 		}
 	}()
 	return future
@@ -257,6 +263,7 @@ func CancellableGoroutineFuture[T any](f func(signal <-chan struct{}) (T, error)
 		future.threadsafeFuture.value = res
 		for _, handle := range future.threadsafeFuture.awaitHandles {
 			handle.signal <- struct{}{} // notify active await
+			close(handle.signal)
 		}
 	}()
 	return future
