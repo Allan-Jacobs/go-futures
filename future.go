@@ -347,3 +347,37 @@ func SleepFuture(duration time.Duration) CancellableFuture[struct{}] {
 		return struct{}{}, nil
 	})
 }
+
+//////////////////////////
+// Completeable Futures //
+//////////////////////////
+
+type Completer[T any] struct {
+	inner *threadsafeFuture[T]
+}
+
+func (c Completer[T]) Complete(val T) {
+	c.inner.mutex.Lock()
+	defer c.inner.mutex.Unlock()
+	if c.inner.state == futurePending {
+		c.inner.value = val
+		c.inner.state = futureResolved
+	}
+}
+
+func (c Completer[T]) Error(err error) {
+	c.inner.mutex.Lock()
+	defer c.inner.mutex.Unlock()
+	if c.inner.state == futurePending {
+		c.inner.err = err
+		c.inner.state = futureRejected
+	}
+}
+
+func CompleteableFuture[T any]() (Completer[T], Future[T]) {
+	f := &threadsafeFuture[T]{
+		state:        futurePending,
+		awaitHandles: make([]struct{ signal chan<- struct{} }, 0),
+	}
+	return Completer[T]{inner: f}, f
+}
