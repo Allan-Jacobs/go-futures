@@ -289,7 +289,7 @@ func (f *settledFuture[T]) Await() (T, error) {
 }
 
 // Returns a future that resolves to value
-func Resolved[T any](value T) Future[T] {
+func ResolvedFuture[T any](value T) Future[T] {
 	return &settledFuture[T]{
 		state: futureResolved,
 		err:   nil,
@@ -298,7 +298,7 @@ func Resolved[T any](value T) Future[T] {
 }
 
 // Returns a future that rejects with err
-func Rejected[T any](err error) Future[T] {
+func RejectedFuture[T any](err error) Future[T] {
 	return &settledFuture[T]{
 		state: futureRejected,
 		err:   err,
@@ -313,7 +313,7 @@ func Rejected[T any](err error) Future[T] {
 // A future that resolves to the next value of the channel
 func ChannelFuture[T any](ch <-chan T) Future[T] {
 	if ch == nil {
-		return Rejected[T](ErrReadFromNilChannel)
+		return RejectedFuture[T](ErrReadFromNilChannel)
 	}
 	return GoroutineFuture(func() (T, error) {
 		res, isOpen := <-ch

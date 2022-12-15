@@ -157,7 +157,7 @@ func TestGoroutineFutureReject(t *testing.T) {
 }
 
 func TestSettledFutureResolve(t *testing.T) {
-	future := Resolved(4)
+	future := ResolvedFuture(4)
 	res, err := future.Await()
 	if err != nil {
 		t.Fatalf("err != nil, got %v", err)
@@ -169,7 +169,7 @@ func TestSettledFutureResolve(t *testing.T) {
 
 func TestSettledFutureReject(t *testing.T) {
 	expectedError := errors.New("Rejected!")
-	future := Rejected[int](expectedError)
+	future := RejectedFuture[int](expectedError)
 	res, err := future.Await()
 	if err == nil {
 		t.Fatalf("err == nil, got res: %d", res)
