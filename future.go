@@ -83,7 +83,7 @@ const (
 )
 
 // a future that is similar to a javascript promise
-type threadsafeFuture[T any] struct {
+type threadSafeFuture[T any] struct {
 	state        futureStatus
 	err          error
 	value        T
@@ -93,27 +93,27 @@ type threadsafeFuture[T any] struct {
 	mutex sync.Mutex
 }
 
-// a future that wraps threadsafeFuture into a cancellable future
-type cancellableThreadsafeFuture[T any] struct {
-	threadsafeFuture threadsafeFuture[T]
+// a future that wraps threadSafeFuture into a cancellable future
+type cancellableThreadSafeFuture[T any] struct {
+	threadSafeFuture threadSafeFuture[T]
 	signal           chan struct{}
 }
 
-func (c *cancellableThreadsafeFuture[T]) Await() (T, error) {
-	return c.threadsafeFuture.Await()
+func (c *cancellableThreadSafeFuture[T]) Await() (T, error) {
+	return c.threadSafeFuture.Await()
 }
 
-func (c *cancellableThreadsafeFuture[T]) Cancel() bool {
-	c.threadsafeFuture.mutex.Lock()
-	defer c.threadsafeFuture.mutex.Unlock()
-	if c.threadsafeFuture.state != futurePending {
+func (c *cancellableThreadSafeFuture[T]) Cancel() bool {
+	c.threadSafeFuture.mutex.Lock()
+	defer c.threadSafeFuture.mutex.Unlock()
+	if c.threadSafeFuture.state != futurePending {
 		// already completed
 		return false
 	} else {
-		c.threadsafeFuture.err = ErrCancelled
-		c.threadsafeFuture.state = futureRejected
+		c.threadSafeFuture.err = ErrCancelled
+		c.threadSafeFuture.state = futureRejected
 	}
-	for _, handle := range c.threadsafeFuture.awaitHandles {
+	for _, handle := range c.threadSafeFuture.awaitHandles {
 		handle.signal <- struct{}{} // notify active await
 		close(handle.signal)
 	}
@@ -129,7 +129,7 @@ func (c *cancellableThreadsafeFuture[T]) Cancel() bool {
 type Resolver[T any] func(T)
 type Rejector func(error)
 
-func (c *threadsafeFuture[T]) Await() (T, error) {
+func (c *threadSafeFuture[T]) Await() (T, error) {
 
 	// scope the defer to this function, so we can release the lock before reading the channel
 	ch, needToWait := func() (<-chan struct{}, bool) {
@@ -163,7 +163,7 @@ func (c *threadsafeFuture[T]) Await() (T, error) {
 // calls are discouraged, as it acquires a mutex every call.
 func PromiseLikeFuture[T any](f func(resolve Resolver[T], reject Rejector)) Future[T] {
 
-	future := &threadsafeFuture[T]{
+	future := &threadSafeFuture[T]{
 		state:        futurePending,
 		awaitHandles: make([]struct{ signal chan<- struct{} }, 0),
 	}
@@ -205,7 +205,7 @@ func PromiseLikeFuture[T any](f func(resolve Resolver[T], reject Rejector)) Futu
 
 // This runs f in a goroutine and returns a future that settles the the result of f
 func GoroutineFuture[T any](f func() (T, error)) Future[T] {
-	future := &threadsafeFuture[T]{
+	future := &threadSafeFuture[T]{
 		state:        futurePending,
 		awaitHandles: make([]struct{ signal chan<- struct{} }, 0),
 	}
@@ -234,12 +234,12 @@ func GoroutineFuture[T any](f func() (T, error)) Future[T] {
 }
 
 // This runs f in a goroutine and returns a future that settles the the result of f.
-// The goroutine should cancel its operation when it recives a value on signal
+// The goroutine should cancel its operation when it receives a value on signal
 // This future can be cancelled.
 func CancellableGoroutineFuture[T any](f func(signal <-chan struct{}) (T, error)) CancellableFuture[T] {
 	signal := make(chan struct{})
-	future := &cancellableThreadsafeFuture[T]{
-		threadsafeFuture: threadsafeFuture[T]{
+	future := &cancellableThreadSafeFuture[T]{
+		threadSafeFuture: threadSafeFuture[T]{
 			state:        futurePending,
 			awaitHandles: make([]struct{ signal chan<- struct{} }, 0),
 		},
@@ -248,20 +248,20 @@ func CancellableGoroutineFuture[T any](f func(signal <-chan struct{}) (T, error)
 
 	go func() {
 		res, err := f(signal)
-		future.threadsafeFuture.mutex.Lock()
-		defer future.threadsafeFuture.mutex.Unlock()
-		if future.threadsafeFuture.state != futurePending {
+		future.threadSafeFuture.mutex.Lock()
+		defer future.threadSafeFuture.mutex.Unlock()
+		if future.threadSafeFuture.state != futurePending {
 			return // do nothing if already resolved
 		}
 		if err != nil {
-			future.threadsafeFuture.state = futureRejected
+			future.threadSafeFuture.state = futureRejected
 		} else {
-			future.threadsafeFuture.state = futureResolved
+			future.threadSafeFuture.state = futureResolved
 		}
 
-		future.threadsafeFuture.err = err
-		future.threadsafeFuture.value = res
-		for _, handle := range future.threadsafeFuture.awaitHandles {
+		future.threadSafeFuture.err = err
+		future.threadSafeFuture.value = res
+		for _, handle := range future.threadSafeFuture.awaitHandles {
 			handle.signal <- struct{}{} // notify active await
 			close(handle.signal)
 		}
@@ -348,12 +348,12 @@ func SleepFuture(duration time.Duration) CancellableFuture[struct{}] {
 	})
 }
 
-//////////////////////////
-// Completeable Futures //
-//////////////////////////
+/////////////////////////
+// Completable Futures //
+/////////////////////////
 
 type Completer[T any] struct {
-	inner *threadsafeFuture[T]
+	inner *threadSafeFuture[T]
 }
 
 func (c Completer[T]) Complete(val T) {
@@ -374,8 +374,10 @@ func (c Completer[T]) Error(err error) {
 	}
 }
 
-func CompleteableFuture[T any]() (Completer[T], Future[T]) {
-	f := &threadsafeFuture[T]{
+// Returns a Completer and a Future. The Future is settled when
+// the Completer or Error gets called on the Completer
+func CompletableFuture[T any]() (Completer[T], Future[T]) {
+	f := &threadSafeFuture[T]{
 		state:        futurePending,
 		awaitHandles: make([]struct{ signal chan<- struct{} }, 0),
 	}

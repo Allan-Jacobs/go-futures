@@ -37,7 +37,7 @@ func ChainErr[T, O any](future Future[T], mapper func(T, error) (O, error)) Futu
 	})
 }
 
-// OnSettled takes a Future[T] and exectutes the callback in another goroutine when it is settled
+// OnSettled takes a Future[T] and executes the callback in another goroutine when it is settled
 func OnSettled[T any](future Future[T], callback func(T, error)) {
 	go func() {
 		res, err := future.Await()
@@ -45,7 +45,7 @@ func OnSettled[T any](future Future[T], callback func(T, error)) {
 	}()
 }
 
-// OnReject takes a Future[T] and exectutes the callback in another goroutine if the future rejects
+// OnReject takes a Future[T] and executes the callback in another goroutine if the future rejects
 func OnReject[T any](future Future[T], callback Rejector) {
 	go func() {
 		_, err := future.Await()
@@ -55,7 +55,7 @@ func OnReject[T any](future Future[T], callback Rejector) {
 	}()
 }
 
-// OnResolve takes a Future[T] and exectutes the callback in another goroutine if the future resolves
+// OnResolve takes a Future[T] and executes the callback in another goroutine if the future resolves
 func OnResolve[T any](future Future[T], callback Resolver[T]) {
 	go func() {
 		res, err := future.Await()
