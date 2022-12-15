@@ -1,6 +1,8 @@
 # Go-Futures
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/release/Allan-Jacobs/go-futures.svg)](https://github.com/Allan-Jacobs/go-futures/releases/latest)
+[![PkgGoDev](https://img.shields.io/badge/go.dev-docs-007d9c)](https://pkg.go.dev/github.com/Allan-Jacobs/go-futures)
 
 An easy to use generic future implementation in Go.
 
