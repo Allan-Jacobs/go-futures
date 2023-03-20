@@ -70,10 +70,7 @@ func Timeout[T any](future Future[T], timeout time.Duration) Future[T] {
 	return Race(
 		future,
 		Chain[struct{}](SleepFuture(timeout), func(s struct{}) (T, error) {
-			switch c := future.(type) {
-			case CancellableFuture[T]:
-				c.Cancel() // cancel the future if its cancellable
-			}
+			tryCancel(future)
 			return *new(T), ErrTimeout
 		}),
 	)
@@ -115,12 +112,16 @@ func All[T any](futures ...Future[T]) Future[[]T] {
 func Race[T any](futures ...Future[T]) Future[T] {
 	return PromiseLikeFuture(func(resolve Resolver[T], reject Rejector) {
 		for _, future := range futures {
+			var once sync.Once
 			OnSettled(future, func(t T, err error) {
 				if err != nil {
 					reject(err)
 				} else {
 					resolve(t)
 				}
+				once.Do(func() {
+					tryCancelAll(futures) // cancel any remaining futures if they are cancellable
+				})
 			})
 		}
 	})
@@ -142,6 +143,7 @@ func Any[T any](futures ...Future[T]) Future[T] {
 					wg.Done()
 				} else {
 					wg.Done()
+					tryCancelAll(futures) // cancel any remaining futures if they are cancellable
 					resolve(t)
 				}
 			})
